@@ -1235,64 +1235,93 @@ t9monsterTurn m k
     kh = getHealth k
     ma = max 0 ((getAttack m) - (knightDefense k))
 
+check :: Int -> T9Monster -> T9Knight -> String -> String
+check n m k expected = (show n) ++ ":\t" ++ ok  ++ "\t" ++ expected ++ "\t->\t" ++ output  
+  where
+    output = t9fight m k
+    ok = if output == expected then "Passed" else "Failed"
+
 test :: Int -> String
 test n = case n of
-  1 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+  1 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 3 [T9Attack])
           k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-  2 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Knight Win"
+  2 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 13 3 [T9Attack])
           k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-  3 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Monster Win"
+  3 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 13 3 [T9Attack])
           k = T9Knight  (Com 10 3 [T9Attack]) 1 0 0
-  4 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Knight Win"
+  4 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 13 3 [T9Attack])
           k = T9Knight  (Com 13 3 [Potion,T9Attack,T9Attack,T9Attack,T9Attack]) 0 3 0
-  5 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Knight Win"
+  5 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 13 3 [T9Attack])
           k = T9Knight  (Com 13 3 [Spell,T9Attack,T9Attack,T9Attack,T9Attack]) 0 0 1
-  6 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Knight Win"
+  6 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 3 [T9Attack,T9Attack,T9Attack,Runaway])
           k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-  11 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Knight Win"
+  11 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com  0 3 [T9Attack])
           k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-  12 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Draw"
+  12 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 0 [T9Attack])
           k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-  13 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Draw"
+  13 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 3 [T9Attack])
           k = T9Knight  (Com  0 3 [T9Attack]) 0 0 0
-  14 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Draw"
+  14 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 3 [T9Attack])
           k = T9Knight  (Com 10 0 [T9Attack]) 0 0 0
-  21 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "Draw"
+  15 ->  check n m k expected ++ "\n"
+        where 
+          m = T9Monster (Com 10 3 [])
+          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
+          expected = "Draw"
+  16 ->  check n m k expected ++ "\n"
+        where 
+          m = T9Monster (Com 10 3 [T9Attack])
+          k = T9Knight  (Com 10 3 []) 0 0 0
+          expected = "Draw"
+  21 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 3 [T9Attack,Potion])
           k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-  22 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "[Error] Invalid Action in MonsterTurn : Potion"
+  22 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 3 [T9Attack,Spell])
           k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-  23 ->  (show n) ++ ": " ++ (t9fight m k) ++ "\n"
+          expected = "[Error] Invalid Action in MonsterTurn : Spell"
+  23 ->  check n m k expected ++ "\n"
         where 
           m = T9Monster (Com 10 3 [T9Attack])
           k = T9Knight  (Com 10 3 [T9Attack,Runaway]) 0 0 0
+          expected = "[Error] Invalid Action in t9knightTurn : Runaway"
   _  -> "[Error] Invalid number : " ++ (show n)
 
 testAll :: Int -> String
-testAll _ = concatMap test ([1 .. 6] ++ [11 .. 14] ++ [21 .. 23])
+testAll _ = concatMap test ([1 .. 6] ++ [11 .. 16] ++ [21 .. 23])
 
 -- putStrLn(testAll 1)
 

@@ -349,7 +349,7 @@ ghci> :l src/Chapter2.hs
 -}
 subList :: Int -> Int -> [a] -> [a]
 subList s e l
-  | s < 0 || e < 0 = []
+  | s < 0 = []
   | otherwise = drop s (take (e + 1) l)
 
 {- |
@@ -642,9 +642,10 @@ Write a function that takes elements of a list only on even positions.
 >>> takeEven [2, 1, 3, 5, 4]
 [2,3,4]
 -}
+takeEven :: [Int] -> [Int]
 takeEven [] = []
 takeEven [x] = [x]
-takeEven (e: o: xs) = e : takeEven xs 
+takeEven (e: _: xs) = e : takeEven xs 
 
 {- |
 =🛡= Higher-order functions
@@ -751,13 +752,10 @@ value of the element itself
 🕯 HINT: Use combination of 'map' and 'replicate'
 -}
 smartReplicate :: [Int] -> [Int]
-smartReplicate [] = []
-smartReplicate (x: xs) = replicate x x ++ smartReplicate xs
+smartReplicate l = concatMap repeatN l
   where
-    replicate :: Int -> Int -> [Int]
-    replicate n x
-      | n < 1 = []
-      | otherwise = x : replicate (n - 1) x
+    repeatN :: Int -> [Int]
+    repeatN n = take n (repeat n)
 
 {- |
 =⚔️= Task 9
@@ -771,7 +769,7 @@ the list with only those lists that contain a passed element.
 🕯 HINT: Use the 'elem' function to check whether an element belongs to a list
 -}
 contains :: Int -> [[Int]] -> [[Int]]
-contains x l = filter (\ xs -> elem x xs) l
+contains x = filter (elem x)
 
 
 {- |
@@ -877,7 +875,14 @@ list.
 rotate :: Int -> [Int] -> [Int]
 rotate n l
   | n < 0 = []
-  | otherwise = take (length l) (drop n (cycle l))
+  | otherwise = take len (drop m (cycle l))
+  where
+    len = length l
+    m   = mod n len
+
+
+
+  
 
 {- |
 =💣= Task 12*
@@ -900,7 +905,7 @@ rewind (x: xs) = rewind2 xs [x]
   where
     rewind2 :: [Int] -> [Int] -> [Int]
     rewind2 [] l = l
-    rewind2 (x: xs) l = rewind2 xs (x: l)
+    rewind2 (y: ys) l = rewind2 ys (y: l)
 
 
 

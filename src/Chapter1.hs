@@ -523,7 +523,7 @@ branches because it is an expression and it must always return some value.
   satisfying the check will be returned and, therefore, evaluated.
 -}
 closestToZero :: Int -> Int -> Int
-closestToZero x y = if abs(x) < abs(y) then x else y
+closestToZero x y = if abs x < abs y then x else y
 
 
 {- |
@@ -561,7 +561,7 @@ mid :: Int -> Int -> Int -> Int
 mid x y z
   | (y <= x && x <= z) || (z <= x && x <= y) = x
   | (z <= y && y <= x) || (x <= y && y <= z) = y
-  | (x <= z && z <= y) || (y <= z && z <= x) = z
+  | otherwise                                = z
     
 {- |
 =⚔️= Task 8
@@ -647,10 +647,10 @@ specifying complex expressions.
 -}
 
 sumLast2 :: Int -> Int
-sumLast2 n = last1 + last2
+sumLast2 n = digit1 + digit10
   where
-    last1 = mod (abs n) 10
-    last2 = div (mod (abs n) 100) 10
+    (div10, digit1) = divMod (abs n) 10
+    digit10 = mod div10 10
 
 
 {- |

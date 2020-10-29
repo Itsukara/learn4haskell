@@ -349,7 +349,7 @@ ghci> :l src/Chapter2.hs
 -}
 subList :: Int -> Int -> [a] -> [a]
 subList s e l
-  | s < 0 = []
+  | s < 0 || e < 0 || s > e = []
   | otherwise = drop s (take (e + 1) l)
 
 {- |

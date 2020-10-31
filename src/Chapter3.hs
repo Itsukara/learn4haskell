@@ -50,6 +50,8 @@ signatures in places where you can't by default. We believe it's helpful to
 provide more top-level type signatures, especially when learning Haskell.
 -}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Chapter3 where
 
@@ -531,35 +533,62 @@ After defining the city, implement the following functions:
    and at least 10 living __people__ inside in all houses of the city totally.
 -}
 
-data Castle   = NoCastle | Castle String      deriving (Show)
-data Wall     = NoWall   | HasWall            deriving (Show)
-data ChOrLib  = Church   | Library            deriving (Show)
-data House    = House { housePeople :: Int }  deriving (Show)
+data Castle   = Castle  String                          deriving (Show)
+data Wall     = Wall                                    deriving (Show)
+data ChOrLib  = Church  | Library                       deriving (Show)
+data House    = HouseP1 | HouseP2 | HouseP3 | HouseP4   deriving (Show)
 
 data City = City
-  { cityCastle  :: Castle
-  , cityWall    :: Wall
-  , cityChOrLib :: ChOrLib
-  , cityHouse   :: [House]
+  { cityCastleAndWall :: Maybe (Castle, Maybe Wall)
+  , cityChOrLib       :: ChOrLib
+  , cityHouses        :: [House]
   } deriving (Show)
 
 buildCastle :: City -> String -> City
-buildCastle city name = city { cityCastle = Castle name }
+buildCastle (City Nothing          chorlib houses) name = City (Just (Castle name, Nothing)) chorlib houses
+buildCastle (City (Just (_, wall)) chorlib houses) name = City (Just (Castle name, wall))    chorlib houses
 
-buildHouse :: City -> Int -> City
-buildHouse city people = city { cityHouse = House people : (cityHouse city) }
+buildHouse :: City -> House -> City
+buildHouse city house = city { cityHouses = house: (cityHouses city) }
 
 buildWalls :: City -> City
-buildWalls city = if hasCaslte && manyPeople then city { cityWall = HasWall } else city
-  where
-    hasCaslte = case cityCastle city of
-      NoCastle -> False
-      Castle _ -> True
-    manyPeople = numPeople (cityHouse  city) >= 10
+buildWalls (City (Just (Castle castle, _)) chorlib houses) = 
+  if numPeople houses >= 10 then City (Just (Castle castle, Just Wall)) chorlib houses
+                            else error "At least 10 people must live in city"
+buildWalls _ = error "City must have a castle"   
 
 numPeople :: [House] -> Int
 numPeople [] = 0
-numPeople (x: xs) = (housePeople x) + (numPeople xs)
+numPeople (HouseP1: xs) = 1 + (numPeople xs)
+numPeople (HouseP2: xs) = 2 + (numPeople xs)
+numPeople (HouseP3: xs) = 3 + (numPeople xs)
+numPeople (HouseP4: xs) = 4 + (numPeople xs)
+
+
+t5Run1 :: IO ()
+t5Run1 = do
+    putStrLn(concatMap (\x -> show(x) ++ "\n\n") l)
+    putStrLn(show (buildWalls city4))
+  where
+    city0 = City Nothing Church  []
+    city1 = City Nothing Library []
+    city2 = buildCastle city1 "Neuschwanstein"
+    city3 = buildHouse  city2 HouseP4
+    city4 = buildHouse  city3 HouseP4
+    city5 = buildHouse  city4 HouseP2
+    city6 = buildWalls  city5
+    l = [city0, city1, city2, city3, city4, city5, city6] 
+
+t5Run2 :: IO ()
+t5Run2 = do
+    putStrLn(concatMap (\x -> show(x) ++ "\n\n") l)
+    putStrLn(show (buildWalls city5))
+  where
+    city2 = City Nothing Library []
+    city3 = buildHouse  city2 HouseP4
+    city4 = buildHouse  city3 HouseP4
+    city5 = buildHouse  city4 HouseP2
+    l = [city5] 
 
 {-
 =🛡= Newtypes
@@ -1018,14 +1047,13 @@ instance Append Gold where
 
 instance Append [a] where
     append :: [a] -> [a] -> [a]
-    append l1 l2 = l1 ++ l2
+    append = (++)
 
 instance (Append a) => Append (Maybe a) where
     append :: Maybe a -> Maybe a -> Maybe a
     append (Just x) (Just y) = Just (append x y)
-    append (Just x) Nothing  = Just x
-    append Nothing (Just y)  = Just y
-    append Nothing  Nothing  = Nothing
+    append a        Nothing  = a
+    append Nothing  b        = b
 
 {-
 =🛡= Standard Typeclasses and Deriving
@@ -1087,14 +1115,14 @@ implement the following functions:
 🕯 HINT: to implement this task, derive some standard typeclasses
 -}
 data Weekday
-  = Saturday
-  | Sunday
-  | Monday
+  = Monday
   | Tuesday
   | Wednesday
   | Thursday
   | Friday
-  deriving (Show, Read, Eq, Ord, Bounded, Enum)
+  | Saturday
+  | Sunday 
+  deriving (Show, Eq, Bounded, Enum)
 
 isWeekend :: Weekday -> Bool
 isWeekend Saturday  = True
@@ -1102,11 +1130,11 @@ isWeekend Sunday    = True
 isWeekend _         = False
 
 nextDay :: Weekday -> Weekday
-nextDay Friday  = Saturday
-nextDay weekday = succ weekday 
+nextDay weekday = if weekday == maxBound then minBound else succ weekday 
 
 daysToParty :: Weekday -> Int
-daysToParty weekday = (fromEnum Friday) - (fromEnum weekday)
+daysToParty weekday = mod ((fromEnum Friday) + daysInWeek - (fromEnum weekday)) daysInWeek
+  where daysInWeek = (fromEnum (maxBound::Weekday)) - (fromEnum (minBound::Weekday)) + 1
 
 {-
 =💣= Task 9*
@@ -1143,20 +1171,42 @@ Implement data types and typeclasses, describing such a battle between two
 contestants, and write a function that decides the outcome of a fight!
 -}
 
-data Action = T9Attack | Potion | Spell | Runaway  deriving (Show, Eq)
-
 data Com = Com
   { comHealth    :: Int
   , comAttack    :: Int
-  , comActions   :: [Action]
   } deriving (Show)
 
+class ComCl a where
+  getCom :: a -> Com
+  setCom :: a -> Com -> a
+
+getHealth  :: (ComCl a) => a -> Int
+getHealth a     = comHealth (getCom a)
+
+getAttack  :: (ComCl a) => a -> Int
+getAttack a     = comAttack (getCom a)
+
+addHealth  :: (ComCl a) => a -> Int -> a
+addHealth a dh  = setCom a ((getCom a) { comHealth = h2})
+  where
+    h2 = (getHealth a) + dh
+
+
+data MAction = MAttack | Runaway        deriving (Show, Eq)
+data KAction = KAttack | Potion | Spell deriving (Show, Eq)
+
+class ActionsCl p b | p -> b where
+  getActions :: p -> [b]
+  setActions :: p -> [b] -> p
+
 data T9Monster = T9Monster
-  { monsterCom   :: Com
+  { monsterCom         :: Com
+  , monsterActions     :: [MAction]
   } deriving (Show)
 
 data T9Knight = T9Knight
   { knightCom          :: Com
+  , knightActions      :: [KAction]
   , knightDefense      :: Int
   , knightPotionEffect :: Int
   , knightSpellEffect  :: Int
@@ -1165,9 +1215,6 @@ data T9Knight = T9Knight
 addDefense :: T9Knight -> Int -> T9Knight
 addDefense k dd = k { knightDefense = (knightDefense k) + dd }
 
-class ComCl a where
-  getCom :: a -> Com
-  setCom :: a -> Com -> a
 
 instance ComCl T9Monster where
   getCom :: T9Monster -> Com
@@ -1181,41 +1228,39 @@ instance ComCl T9Knight where
   setCom :: T9Knight -> Com -> T9Knight
   setCom a c = a {knightCom = c}
 
-getHealth  :: (ComCl a) => a -> Int
-getHealth a     = comHealth (getCom a)
 
-getAttack  :: (ComCl a) => a -> Int
-getAttack a     = comAttack (getCom a)
+instance ActionsCl T9Monster MAction where
+  getActions :: T9Monster -> [MAction]
+  getActions p = monsterActions p
+  setActions :: T9Monster -> [MAction] -> T9Monster
+  setActions p acs = p {monsterActions = acs}
 
-getActions :: (ComCl a) => a -> [Action]
-getActions a    = comActions (getCom a)
+instance ActionsCl T9Knight KAction where
+  getActions :: T9Knight -> [KAction]
+  getActions p = knightActions p
+  setActions :: T9Knight -> [KAction] -> T9Knight
+  setActions p acs = p {knightActions = acs}
 
-addHealth  :: (ComCl a) => a -> Int -> a
-addHealth a dh  = setCom a ((getCom a) { comHealth = h2})
-  where
-    h2 = (getHealth a) + dh
 
-setActions :: (ComCl a) => a -> [Action] -> a
-setActions a acs = setCom a ((getCom a) { comActions = acs })
-
-t9fight :: T9Monster -> T9Knight -> String
-t9fight m k
+t9fight :: (T9Monster, T9Knight) -> String
+t9fight (m, k)
   | mh <= 0 || kh <= 0        = "Draw"
   | ma <= 0 || ka <= 0        = "Draw"
   | macs == [] || kacs == []  = "Draw"
   | otherwise                 = t9knightTurn m2 k2
   where 
-    (Com mh ma macs) = getCom m
-    (Com kh ka kacs) = getCom k
+    (Com mh ma) = getCom m
+    (Com kh ka) = getCom k
+    macs = getActions m
     m2 = setActions m (cycle macs)
+    kacs = getActions k
     k2 = setActions k (cycle kacs)
 
 t9knightTurn ::  T9Monster -> T9Knight -> String
 t9knightTurn m k
   | ac == Potion = t9monsterTurn m (addHealth  k2 po)
   | ac == Spell  = t9monsterTurn m (addDefense k2 sp)  
-  | ac == T9Attack = if mh <= ka then "Knight Win" else t9monsterTurn (addHealth m (-ka)) k2
-  | otherwise    = "[Error] Invalid Action in t9knightTurn : " ++ (show ac)
+  | otherwise    = if mh <= ka then "Knight Win" else t9monsterTurn (addHealth m (-ka)) k2
   where
     ac: acs = getActions k
     k2 = setActions k acs
@@ -1227,103 +1272,122 @@ t9knightTurn m k
 t9monsterTurn ::  T9Monster -> T9Knight -> String
 t9monsterTurn m k
   | ac == Runaway = "Draw"
-  | ac == T9Attack  = if kh <= ma then "Monster Win" else t9knightTurn m2 (addHealth k (-ma))
-  | otherwise    = "[Error] Invalid Action in MonsterTurn : " ++ (show ac)
+  | otherwise     = if kh <= ma then "Monster Win" else t9knightTurn m2 (addHealth k (-ma))
   where
     ac: acs = getActions m
     m2 = setActions m acs
     kh = getHealth k
     ma = max 0 ((getAttack m) - (knightDefense k))
 
-check :: Int -> T9Monster -> T9Knight -> String -> String
-check n m k expected = (show n) ++ ":\t" ++ ok  ++ "\t" ++ expected ++ "\t->\t" ++ output  
+
+class TestCl a where
+  testName     :: a -> String
+  testResult   :: a -> String
+  testExpected :: a -> String
+
+testOne :: TestCl a => a -> String
+testOne a = name ++ ":\t" ++ checkresult  ++ "\t" ++ expected ++ "\t->\t" ++ result
   where
-    output = t9fight m k
-    ok = if output == expected then "Passed" else "Failed"
+    name     = testName     a
+    result   = testResult   a
+    expected = testExpected a
+    checkresult = if result == expected then "Passed" else "Failed"
 
-test :: Int -> String
-test n = case n of
-  1 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "Knight Win"
-  2 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 13 3 [T9Attack])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "Monster Win"
-  3 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 13 3 [T9Attack])
-          k = T9Knight  (Com 10 3 [T9Attack]) 1 0 0
-          expected = "Knight Win"
-  4 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 13 3 [T9Attack])
-          k = T9Knight  (Com 13 3 [Potion,T9Attack,T9Attack,T9Attack,T9Attack]) 0 3 0
-          expected = "Knight Win"
-  5 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 13 3 [T9Attack])
-          k = T9Knight  (Com 13 3 [Spell,T9Attack,T9Attack,T9Attack,T9Attack]) 0 0 1
-          expected = "Knight Win"
-  6 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack,T9Attack,T9Attack,Runaway])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "Knight Win"
-  11 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com  0 3 [T9Attack])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "Draw"
-  12 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 0 [T9Attack])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "Draw"
-  13 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack])
-          k = T9Knight  (Com  0 3 [T9Attack]) 0 0 0
-          expected = "Draw"
-  14 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack])
-          k = T9Knight  (Com 10 0 [T9Attack]) 0 0 0
-          expected = "Draw"
-  15 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "Draw"
-  16 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack])
-          k = T9Knight  (Com 10 3 []) 0 0 0
-          expected = "Draw"
-  21 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack,Potion])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "[Error] Invalid Action in MonsterTurn : Potion"
-  22 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack,Spell])
-          k = T9Knight  (Com 10 3 [T9Attack]) 0 0 0
-          expected = "[Error] Invalid Action in MonsterTurn : Spell"
-  23 ->  check n m k expected ++ "\n"
-        where 
-          m = T9Monster (Com 10 3 [T9Attack])
-          k = T9Knight  (Com 10 3 [T9Attack,Runaway]) 0 0 0
-          expected = "[Error] Invalid Action in t9knightTurn : Runaway"
-  _  -> "[Error] Invalid number : " ++ (show n)
+testAll :: TestCl a => [a] -> IO ()
+testAll l = putStrLn(concatMap (\x -> testOne x ++ "\n") l)
 
-testAll :: Int -> String
-testAll _ = concatMap test ([1 .. 6] ++ [11 .. 16] ++ [21 .. 23])
+data T9TestCase = T9TestCase
+  { t9TestName :: String
+  , t9Monster  :: T9Monster
+  , t9Knight   :: T9Knight
+  , t9Expected :: String
+  } deriving (Show)
 
--- putStrLn(testAll 1)
+instance TestCl T9TestCase where
+  testName     :: T9TestCase -> String
+  testName     a = t9TestName a
+  testResult   :: T9TestCase -> String
+  testResult   a = t9fight (t9Monster a, t9Knight a)
+  testExpected :: T9TestCase -> String
+  testExpected a = t9Expected a
+
+t9testcases :: [T9TestCase]
+t9testcases = 
+  [ (T9TestCase 
+      "Same Health                  " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Knight Win"
+    )
+  , (T9TestCase 
+      "Monster Health is Higher 3 Pt" 
+      (T9Monster (Com 13 3) [MAttack])        -- Health: 10 -> 13
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Monster Win"
+    )  
+  , (T9TestCase 
+      "Knight will Defense          " 
+      (T9Monster (Com 13 3) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 1 6 2)  -- Defense: 0 -> 1
+      "Knight Win"
+    )  
+  , (T9TestCase 
+      "Knight will drink Potion     " 
+      (T9Monster (Com 13 3) [MAttack])
+      (T9Knight  (Com 10 3) [Potion,KAttack,KAttack,KAttack,KAttack] 0 6 2)
+      "Knight Win"
+    )  
+  , (T9TestCase 
+      "Knight will Spell magic      " 
+      (T9Monster (Com 13 3) [MAttack])
+      (T9Knight  (Com 10 3) [Spell,KAttack,KAttack,KAttack,KAttack] 0 6 2)
+      "Knight Win"
+    )  
+  , (T9TestCase 
+      "Monster will Runaway         " 
+      (T9Monster (Com 13 3) [MAttack,Runaway])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Monster Health = 0           " 
+      (T9Monster (Com  0 3) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Knight Health = 0            " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com  0 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Monster Attack = 0           " 
+      (T9Monster (Com 13 0) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Knight Attack = 0            " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com 10 0) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Monster Action = []          " 
+      (T9Monster (Com 10 3) [])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Knight Action = []           " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com 10 3) [] 0 6 2)
+      "Draw"
+    )  
+  ]
+
+-- testAll t9testcases
 
 {-
 You did it! Now it is time to open pull request with your changes

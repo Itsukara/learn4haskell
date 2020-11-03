@@ -50,6 +50,8 @@ signatures in places where you can't by default. We believe it's helpful to
 provide more top-level type signatures, especially when learning Haskell.
 -}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Chapter3 where
 
@@ -343,6 +345,12 @@ Define the Book product data type. You can take inspiration from our description
 of a book, but you are not limited only by the book properties we described.
 Create your own book type of your dreams!
 -}
+data Book = Book
+  { bookName    :: String
+  , bookAuthor  :: String
+  , bookCover   :: String
+  , bookpages   :: Int
+  } deriving (Show)
 
 {- |
 =⚔️= Task 2
@@ -373,6 +381,47 @@ after the fight. The battle has the following possible outcomes:
    doesn't earn any money and keeps what they had before.
 
 -}
+data Monster = Monster
+  { monsterHealth  :: Int
+  , monsterAttack  :: Int
+  , monsterGold    :: Int
+  } deriving (Show)
+
+data Knight = Knight
+  { knightHealth  :: Int
+  , knightAttack  :: Int
+  , knightGold    :: Int
+  } deriving (Show)
+
+fight :: Monster -> Knight -> Int
+fight m k
+  | mh <= 0 || kh <= 0  = kg
+  | ma <= 0 || ka <= 0  = kg
+  | otherwise           = knightTurn m k
+  where
+    mh = monsterHealth m
+    kh = knightHealth  k
+    kg = knightGold    k
+    ma = monsterAttack m
+    ka = knightAttack  k
+
+knightTurn ::  Monster -> Knight -> Int
+knightTurn m k
+  | mh <= ka  = mg + kg
+  | otherwise = monsterTurn (m { monsterHealth = mh - ka }) k
+  where
+    mh = monsterHealth m
+    ka = knightAttack  k
+    mg = monsterGold   m
+    kg = knightGold    k
+
+monsterTurn ::  Monster -> Knight -> Int
+monsterTurn m k
+  | kh <= ma  = -1
+  | otherwise = knightTurn m (k { knightHealth = kh - ma })
+  where
+    kh = knightHealth  k
+    ma = monsterAttack m
 
 {- |
 =🛡= Sum types
@@ -459,6 +508,10 @@ and provide more flexibility when working with data types.
 Create a simple enumeration for the meal types (e.g. breakfast). The one who
 comes up with the most number of names wins the challenge. Use your creativity!
 -}
+data Meal
+  = Breakfast | Lunch | Supper | Dinner
+  | Soup | Appetizer | Salad | Fish | Main | Cheese | Dessert
+
 
 {- |
 =⚔️= Task 4
@@ -479,6 +532,63 @@ After defining the city, implement the following functions:
    complicated task, walls can be built only if the city has a castle
    and at least 10 living __people__ inside in all houses of the city totally.
 -}
+
+data Castle   = Castle  String                          deriving (Show)
+data Wall     = Wall                                    deriving (Show)
+data ChOrLib  = Church  | Library                       deriving (Show)
+data House    = HouseP1 | HouseP2 | HouseP3 | HouseP4   deriving (Show)
+
+data City = City
+  { cityCastleAndWall :: Maybe (Castle, Maybe Wall)
+  , cityChOrLib       :: ChOrLib
+  , cityHouses        :: [House]
+  } deriving (Show)
+
+buildCastle :: City -> String -> City
+buildCastle (City Nothing          chorlib houses) name = City (Just (Castle name, Nothing)) chorlib houses
+buildCastle (City (Just (_, wall)) chorlib houses) name = City (Just (Castle name, wall))    chorlib houses
+
+buildHouse :: City -> House -> City
+buildHouse city house = city { cityHouses = house: (cityHouses city) }
+
+buildWalls :: City -> City
+buildWalls (City (Just (Castle castle, _)) chorlib houses) = 
+  if numPeople houses >= 10 then City (Just (Castle castle, Just Wall)) chorlib houses
+                            else error "At least 10 people must live in city"
+buildWalls _ = error "City must have a castle"   
+
+numPeople :: [House] -> Int
+numPeople [] = 0
+numPeople (HouseP1: xs) = 1 + (numPeople xs)
+numPeople (HouseP2: xs) = 2 + (numPeople xs)
+numPeople (HouseP3: xs) = 3 + (numPeople xs)
+numPeople (HouseP4: xs) = 4 + (numPeople xs)
+
+
+t5Run1 :: IO ()
+t5Run1 = do
+    putStrLn(concatMap (\x -> show(x) ++ "\n\n") l)
+    putStrLn(show (buildWalls city4))
+  where
+    city0 = City Nothing Church  []
+    city1 = City Nothing Library []
+    city2 = buildCastle city1 "Neuschwanstein"
+    city3 = buildHouse  city2 HouseP4
+    city4 = buildHouse  city3 HouseP4
+    city5 = buildHouse  city4 HouseP2
+    city6 = buildWalls  city5
+    l = [city0, city1, city2, city3, city4, city5, city6] 
+
+t5Run2 :: IO ()
+t5Run2 = do
+    putStrLn(concatMap (\x -> show(x) ++ "\n\n") l)
+    putStrLn(show (buildWalls city5))
+  where
+    city2 = City Nothing Library []
+    city3 = buildHouse  city2 HouseP4
+    city4 = buildHouse  city3 HouseP4
+    city5 = buildHouse  city4 HouseP2
+    l = [city5] 
 
 {-
 =🛡= Newtypes
@@ -560,22 +670,30 @@ introducing extra newtypes.
 🕯 HINT: if you complete this task properly, you don't need to change the
     implementation of the "hitPlayer" function at all!
 -}
+newtype Health      = Health    Int    deriving (Show)
+newtype Armor       = Armor     Int    deriving (Show)
+newtype Attack      = Attack    Int    deriving (Show)
+newtype Dexterity   = Dexterity Int    deriving (Show)
+newtype Strength    = Strength  Int    deriving (Show)
+newtype Damage      = Damage    Int    deriving (Show)
+newtype Defense     = Defense   Int    deriving (Show)
+
 data Player = Player
-    { playerHealth    :: Int
-    , playerArmor     :: Int
-    , playerAttack    :: Int
-    , playerDexterity :: Int
-    , playerStrength  :: Int
-    }
+    { playerHealth    :: Health
+    , playerArmor     :: Armor
+    , playerAttack    :: Attack
+    , playerDexterity :: Dexterity
+    , playerStrength  :: Strength
+    } deriving (Show)
 
-calculatePlayerDamage :: Int -> Int -> Int
-calculatePlayerDamage attack strength = attack + strength
+calculatePlayerDamage :: Attack -> Strength -> Damage
+calculatePlayerDamage (Attack attack) (Strength strength) = (Damage (attack + strength))
 
-calculatePlayerDefense :: Int -> Int -> Int
-calculatePlayerDefense armor dexterity = armor * dexterity
+calculatePlayerDefense :: Armor -> Dexterity -> Defense
+calculatePlayerDefense (Armor armor) (Dexterity dexterity) = (Defense (armor * dexterity))
 
-calculatePlayerHit :: Int -> Int -> Int -> Int
-calculatePlayerHit damage defense health = health + defense - damage
+calculatePlayerHit :: Damage -> Defense -> Health -> Health
+calculatePlayerHit (Damage damage) (Defense defense) (Health health) = (Health (health + defense - damage))
 
 -- The second player hits first player and the new first player is returned
 hitPlayer :: Player -> Player -> Player
@@ -752,6 +870,17 @@ parametrise data types in places where values can be of any general type.
 🕯 HINT: 'Maybe' that some standard types we mentioned above are useful for
   maybe-treasure ;)
 -}
+data TreasureChest x = TreasureChest
+  { treasureChestGold :: Int
+  , treasureChestLoot :: x
+  } deriving (Show)
+
+data Dragon power = Dragon power deriving (Show)
+
+data DragonLair power x = DragonLair
+  { lairDragon :: Dragon power
+  , lairChest  :: Maybe (TreasureChest x)
+  } deriving (Show)
 
 {-
 =🛡= Typeclasses
@@ -910,6 +1039,21 @@ Implement instances of "Append" for the following types:
 class Append a where
     append :: a -> a -> a
 
+data Gold = Gold Int deriving (Show)
+
+instance Append Gold where
+    append :: Gold -> Gold -> Gold
+    append (Gold g1) (Gold g2) = Gold (g1 + g2)
+
+instance Append [a] where
+    append :: [a] -> [a] -> [a]
+    append = (++)
+
+instance (Append a) => Append (Maybe a) where
+    append :: Maybe a -> Maybe a -> Maybe a
+    append (Just x) (Just y) = Just (append x y)
+    append a        Nothing  = a
+    append Nothing  b        = b
 
 {-
 =🛡= Standard Typeclasses and Deriving
@@ -970,6 +1114,27 @@ implement the following functions:
 
 🕯 HINT: to implement this task, derive some standard typeclasses
 -}
+data Weekday
+  = Monday
+  | Tuesday
+  | Wednesday
+  | Thursday
+  | Friday
+  | Saturday
+  | Sunday 
+  deriving (Show, Eq, Bounded, Enum)
+
+isWeekend :: Weekday -> Bool
+isWeekend Saturday  = True
+isWeekend Sunday    = True
+isWeekend _         = False
+
+nextDay :: Weekday -> Weekday
+nextDay weekday = if weekday == maxBound then minBound else succ weekday 
+
+daysToParty :: Weekday -> Int
+daysToParty weekday = mod ((fromEnum Friday) + daysInWeek - (fromEnum weekday)) daysInWeek
+  where daysInWeek = (fromEnum (maxBound::Weekday)) - (fromEnum (minBound::Weekday)) + 1
 
 {-
 =💣= Task 9*
@@ -1006,6 +1171,223 @@ Implement data types and typeclasses, describing such a battle between two
 contestants, and write a function that decides the outcome of a fight!
 -}
 
+data Com = Com
+  { comHealth    :: Int
+  , comAttack    :: Int
+  } deriving (Show)
+
+class ComCl a where
+  getCom :: a -> Com
+  setCom :: a -> Com -> a
+
+getHealth  :: (ComCl a) => a -> Int
+getHealth a     = comHealth (getCom a)
+
+getAttack  :: (ComCl a) => a -> Int
+getAttack a     = comAttack (getCom a)
+
+addHealth  :: (ComCl a) => a -> Int -> a
+addHealth a dh  = setCom a ((getCom a) { comHealth = h2})
+  where
+    h2 = (getHealth a) + dh
+
+
+data MAction = MAttack | Runaway        deriving (Show, Eq)
+data KAction = KAttack | Potion | Spell deriving (Show, Eq)
+
+class ActionsCl p b | p -> b where
+  getActions :: p -> [b]
+  setActions :: p -> [b] -> p
+
+data T9Monster = T9Monster
+  { monsterCom         :: Com
+  , monsterActions     :: [MAction]
+  } deriving (Show)
+
+data T9Knight = T9Knight
+  { knightCom          :: Com
+  , knightActions      :: [KAction]
+  , knightDefense      :: Int
+  , knightPotionEffect :: Int
+  , knightSpellEffect  :: Int
+  } deriving (Show)
+
+addDefense :: T9Knight -> Int -> T9Knight
+addDefense k dd = k { knightDefense = (knightDefense k) + dd }
+
+
+instance ComCl T9Monster where
+  getCom :: T9Monster -> Com
+  getCom a = monsterCom a
+  setCom :: T9Monster -> Com -> T9Monster
+  setCom a c = a {monsterCom = c}
+
+instance ComCl T9Knight where
+  getCom :: T9Knight -> Com
+  getCom a = knightCom a
+  setCom :: T9Knight -> Com -> T9Knight
+  setCom a c = a {knightCom = c}
+
+
+instance ActionsCl T9Monster MAction where
+  getActions :: T9Monster -> [MAction]
+  getActions p = monsterActions p
+  setActions :: T9Monster -> [MAction] -> T9Monster
+  setActions p acs = p {monsterActions = acs}
+
+instance ActionsCl T9Knight KAction where
+  getActions :: T9Knight -> [KAction]
+  getActions p = knightActions p
+  setActions :: T9Knight -> [KAction] -> T9Knight
+  setActions p acs = p {knightActions = acs}
+
+
+t9fight :: (T9Monster, T9Knight) -> String
+t9fight (m, k)
+  | mh <= 0 || kh <= 0        = "Draw"
+  | ma <= 0 || ka <= 0        = "Draw"
+  | macs == [] || kacs == []  = "Draw"
+  | otherwise                 = t9knightTurn m2 k2
+  where 
+    (Com mh ma) = getCom m
+    (Com kh ka) = getCom k
+    macs = getActions m
+    m2 = setActions m (cycle macs)
+    kacs = getActions k
+    k2 = setActions k (cycle kacs)
+
+t9knightTurn ::  T9Monster -> T9Knight -> String
+t9knightTurn m k
+  | ac == Potion = t9monsterTurn m (addHealth  k2 po)
+  | ac == Spell  = t9monsterTurn m (addDefense k2 sp)  
+  | otherwise    = if mh <= ka then "Knight Win" else t9monsterTurn (addHealth m (-ka)) k2
+  where
+    ac: acs = getActions k
+    k2 = setActions k acs
+    mh = getHealth m
+    ka = getAttack k
+    po = knightPotionEffect k
+    sp = knightSpellEffect  k
+
+t9monsterTurn ::  T9Monster -> T9Knight -> String
+t9monsterTurn m k
+  | ac == Runaway = "Draw"
+  | otherwise     = if kh <= ma then "Monster Win" else t9knightTurn m2 (addHealth k (-ma))
+  where
+    ac: acs = getActions m
+    m2 = setActions m acs
+    kh = getHealth k
+    ma = max 0 ((getAttack m) - (knightDefense k))
+
+
+class TestCl a where
+  testName     :: a -> String
+  testResult   :: a -> String
+  testExpected :: a -> String
+
+testOne :: TestCl a => a -> String
+testOne a = name ++ ":\t" ++ checkresult  ++ "\t" ++ expected ++ "\t->\t" ++ result
+  where
+    name     = testName     a
+    result   = testResult   a
+    expected = testExpected a
+    checkresult = if result == expected then "Passed" else "Failed"
+
+testAll :: TestCl a => [a] -> IO ()
+testAll l = putStrLn(concatMap (\x -> testOne x ++ "\n") l)
+
+data T9TestCase = T9TestCase
+  { t9TestName :: String
+  , t9Monster  :: T9Monster
+  , t9Knight   :: T9Knight
+  , t9Expected :: String
+  } deriving (Show)
+
+instance TestCl T9TestCase where
+  testName     :: T9TestCase -> String
+  testName     a = t9TestName a
+  testResult   :: T9TestCase -> String
+  testResult   a = t9fight (t9Monster a, t9Knight a)
+  testExpected :: T9TestCase -> String
+  testExpected a = t9Expected a
+
+t9testcases :: [T9TestCase]
+t9testcases = 
+  [ (T9TestCase 
+      "Same Health                  " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Knight Win"
+    )
+  , (T9TestCase 
+      "Monster Health is Higher 3 Pt" 
+      (T9Monster (Com 13 3) [MAttack])        -- Health: 10 -> 13
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Monster Win"
+    )  
+  , (T9TestCase 
+      "Knight will Defense          " 
+      (T9Monster (Com 13 3) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 1 6 2)  -- Defense: 0 -> 1
+      "Knight Win"
+    )  
+  , (T9TestCase 
+      "Knight will drink Potion     " 
+      (T9Monster (Com 13 3) [MAttack])
+      (T9Knight  (Com 10 3) [Potion,KAttack,KAttack,KAttack,KAttack] 0 6 2)
+      "Knight Win"
+    )  
+  , (T9TestCase 
+      "Knight will Spell magic      " 
+      (T9Monster (Com 13 3) [MAttack])
+      (T9Knight  (Com 10 3) [Spell,KAttack,KAttack,KAttack,KAttack] 0 6 2)
+      "Knight Win"
+    )  
+  , (T9TestCase 
+      "Monster will Runaway         " 
+      (T9Monster (Com 13 3) [MAttack,Runaway])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Monster Health = 0           " 
+      (T9Monster (Com  0 3) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Knight Health = 0            " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com  0 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Monster Attack = 0           " 
+      (T9Monster (Com 13 0) [MAttack])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Knight Attack = 0            " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com 10 0) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Monster Action = []          " 
+      (T9Monster (Com 10 3) [])
+      (T9Knight  (Com 10 3) [KAttack] 0 6 2)
+      "Draw"
+    )  
+  , (T9TestCase 
+      "Knight Action = []           " 
+      (T9Monster (Com 10 3) [MAttack])
+      (T9Knight  (Com 10 3) [] 0 6 2)
+      "Draw"
+    )  
+  ]
+
+-- testAll t9testcases
 
 {-
 You did it! Now it is time to open pull request with your changes

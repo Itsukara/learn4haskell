@@ -494,6 +494,10 @@ Implement the 'Applicative' instance for our 'List' type.
   may also need to implement a few useful helper functions for our List
   type.
 -}
+append :: List a -> List a -> List a
+append Empty b       = b
+append (Cons a as) b = Cons a (append as b) 
+
 instance Applicative List where
     pure :: a -> List a
     pure a = Cons a Empty
@@ -501,7 +505,7 @@ instance Applicative List where
     (<*>) :: List (a -> b) -> List a -> List b
     Empty <*> _ = Empty
     _ <*> Empty = Empty
-    (Cons g gs) <*> (Cons x xs) = Cons (g x) (gs <*> xs)  
+    (Cons f fs) <*> a = append (fmap f a) (fs <*> a)  
 
 {- |
 =🛡= Monad
@@ -626,12 +630,13 @@ Implement the 'Monad' instance for our lists.
 -}
 flatten :: List (List a) -> List a
 flatten Empty = Empty
-flatten (Cons (Cons x Empty) xs) = Cons x (flatten xs)
-flatten (Cons _ _)               = Empty
+flatten (Cons x xs) = append x (flatten xs)
 
 instance Monad List where
     (>>=) ::  List a -> (a -> List b) -> List b
     l >>= f  = flatten (fmap f l)  
+
+
 
 {- |
 =💣= Task 8*: Before the Final Boss
@@ -650,7 +655,7 @@ Can you implement a monad version of AND, polymorphic over any monad?
 🕯 HINT: Use "(>>=)", "pure" and anonymous function
 -}
 andM :: (Monad m) => m Bool -> m Bool -> m Bool
-andM fa fb = fa >>= (\a -> if a then fb else pure False)
+andM fa fb = fa >>= \a -> if a then fb else pure False
 -- andM fa fb = fmap (&&) fa <*> fb
 
 {- |
